@@ -1,8 +1,10 @@
 package revolve;
 
 import jssc.SerialPort;
+import jssc.SerialPortEventListener;
 import jssc.SerialPortException;
 import jssc.SerialPortList;
+import jssc.SerialPortEvent;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -46,7 +48,16 @@ public class AppTest{
         serialPort = new SerialPort(name);
         try{
             serialPort.openPort();//Open serial port
-            serialPort.setParams(115200, 8, 1, 0);//Set params
+            assertTrue(serialPort.isOpened());
+            serialPort.setParams(
+                    SerialPort.BAUDRATE_115200,
+                    SerialPort.DATABITS_8,
+                    SerialPort.STOPBITS_1,
+                    SerialPort.PARITY_NONE
+            );//Set params
+//            int mask = SerialPort.MASK_RXCHAR + SerialPort.MASK_CTS + SerialPort.MASK_DSR;//Prepare mask
+//            serialPort.setEventsMask(mask);//Set mask
+            serialPort.addEventListener(new changed());
         } catch (SerialPortException e) {
             e.printStackTrace();
             System.err.println("COM-port Error: There was a problem with opening the port " + serialPort.getPortName());
@@ -57,17 +68,20 @@ public class AppTest{
     @Test
     public void receiveDataFromTelemetryDevice() throws Exception{
         assertNotNull(serialPort);
+        assertTrue(serialPort.writeString("0"));
 
         for(int i = 0; i < 1000; i++){
             StringBuilder builder = new StringBuilder();
-            serialPort.writeInt(48);
-            serialPort.writeInt(49);
+            assertTrue(serialPort.writeString("11111111"));
+            System.out.println(serialPort.getOutputBufferBytesCount());
+            serialPort.purgePort(SerialPort.PURGE_TXCLEAR);
+            System.out.println(serialPort.getOutputBufferBytesCount());
             boolean shouldRun = true;
 
             long start = Calendar.getInstance().getTimeInMillis();
             while(shouldRun){
                 try {
-                    builder.append(serialPort.readBytes(50, 1000));
+                    builder.append(serialPort.readBytes(1, 1000));
                 }catch (Exception e){
                     System.out.println("\n" + e);
                     fail("Failed to receive data at run " + i);
@@ -86,6 +100,16 @@ public class AppTest{
     public void destroy() throws Exception{
         assertTrue(serialPort.closePort());
         serialPort = null;
+    }
+
+    static class changed implements SerialPortEventListener {
+
+
+        @Override
+        public void serialEvent(SerialPortEvent serialPortEvent) {
+            System.out.println(serialPortEvent.getEventType());
+//            System.out.println((char) serialPortEvent.getEventValue());
+        }
     }
 
 }
